@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Star Spiral — turtle art, web edition</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#000; overflow:hidden; }
+  #c { position:fixed; inset:0; width:100vw; height:100vh; display:block; }
+  .title {
+    position:fixed; top:18px; left:0; right:0; text-align:center; color:#fff;
+    font:300 15px/1.4 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing:2px; text-transform:uppercase; opacity:.85; pointer-events:none;
+  }
+  .note {
+    position:fixed; bottom:14px; left:0; right:0; text-align:center; color:#777;
+    font:300 11px/1.4 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing:1px; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="title">Star Spiral — turtle art, web edition</div>
+<div class="note">Web port of the original Python turtle script</div>
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- faithful turtle simulation (y-axis points up, like Python turtle) ---------- */
+  var segs = [];               // {x1,y1,x2,y2,r,g,b}
+  var x = 0, y = 0, heading = 0; // heading 0 = east, degrees
+  var pr = 0, pg = 0, pb = 0;   // pen color
+
+  function rad(d) { return d * Math.PI / 180; }
+  function fd(d) {
+    var nx = x + d * Math.cos(rad(heading));
+    var ny = y + d * Math.sin(rad(heading));
+    segs.push({ x1: x, y1: y, x2: nx, y2: ny, r: pr, g: pg, b: pb });
+    x = nx; y = ny;
+  }
+  function lt(d) { heading += d; }
+  function pencolor(r, g, b) { pr = r; pg = g; pb = b; }
+
+  /* Faithful port of Python's colorsys.hsv_to_rgb(h, s, v).
+     (The original lets h grow past 1.0; colorsys wraps it via i % 6 — same here.) */
+  function hsvToRgb(h, s, v) {
+    var r, g, b;
+    if (s === 0) { r = g = b = v; }
+    else {
+      var i = Math.floor(h * 6.0);
+      var f = (h * 6.0) - i;
+      var p = v * (1.0 - s), q = v * (1.0 - s * f), t = v * (1.0 - s * (1.0 - f));
+      i = ((i % 6) + 6) % 6;
+      if (i === 0) { r = v; g = t; b = p; }
+      else if (i === 1) { r = q; g = v; b = p; }
+      else if (i === 2) { r = p; g = v; b = t; }
+      else if (i === 3) { r = p; g = q; b = v; }
+      else if (i === 4) { r = t; g = p; b = v; }
+      else { r = v; g = p; b = q; }
+    }
+    return [r, g, b];
+  }
+
+  /* ---------- exact port of star_spiral.py ----------
+     Each iteration: color = hsv(h,1,0.9), h += 1/36, left(145),
+     then a 5-point star (forward 300, left 150) x5. */
+  var n = 36, h = 0;
+  for (var i = 0; i < 460; i++) {
+    var c = hsvToRgb(h, 1, 0.9);
+    h += 1 / n;
+    pencolor(Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255));
+    lt(145);
+    for (var j = 0; j < 5; j++) { fd(300); lt(150); }
+  }
+
+  /* ---------- renderer: fit drawing to ~90% of viewport, animate progressively ---------- */
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  var drawn = 0, dpr = 1, W = 0, H = 0;
+  var fitS = 1, fitOX = 0, fitOY = 0;
+
+  var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (var k = 0; k < segs.length; k++) {
+    var s = segs[k];
+    if (s.x1 < minX) minX = s.x1; if (s.x2 < minX) minX = s.x2;
+    if (s.x1 > maxX) maxX = s.x1; if (s.x2 > maxX) maxX = s.x2;
+    if (s.y1 < minY) minY = s.y1; if (s.y2 < minY) minY = s.y2;
+    if (s.y1 > maxY) maxY = s.y1; if (s.y2 > maxY) maxY = s.y2;
+  }
+
+  function tx(px) { return fitOX + px * fitS; }
+  function ty(py) { return fitOY - py * fitS; } // flip: turtle y-up -> canvas y-down
+
+  function drawSeg(sg) {
+    ctx.strokeStyle = "rgb(" + (sg.r | 0) + "," + (sg.g | 0) + "," + (sg.b | 0) + ")";
+    ctx.beginPath();
+    ctx.moveTo(tx(sg.x1), ty(sg.y1));
+    ctx.lineTo(tx(sg.x2), ty(sg.y2));
+    ctx.stroke();
+  }
+
+  function redraw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, H);
+    ctx.lineWidth = 1;
+    for (var k = 0; k < drawn; k++) drawSeg(segs[k]);
+  }
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    var bw = (maxX - minX) || 1, bh = (maxY - minY) || 1;
+    fitS = Math.min((W * 0.9) / bw, (H * 0.9) / bh);
+    fitOX = W / 2 - ((minX + maxX) / 2) * fitS;
+    fitOY = H / 2 + ((minY + maxY) / 2) * fitS;
+    redraw();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  var perFrame = Math.max(1, Math.ceil(segs.length / 220)); // ~220 frames of live drawing
+  function tick() {
+    if (drawn < segs.length) {
+      var n2 = Math.min(perFrame, segs.length - drawn);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.lineWidth = 1;
+      for (var k = 0; k < n2; k++) { drawSeg(segs[drawn]); drawn++; }
+      requestAnimationFrame(tick);
+    }
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
