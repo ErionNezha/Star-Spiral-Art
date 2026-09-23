@@ -1,5 +1,7 @@
 # Star Spiral Art
 
+Created by **Erion Nezha**.
+
 Live demo: https://erionnezha.github.io/Star-Spiral-Art/
 
 A hypnotic star spiral: 460 five-pointed stars, each rotated 145° and shifting hue, drawn on a black canvas. A faithful web port of the original Python turtle + colorsys script.
@@ -18,4 +20,4 @@ Just open `index.html` in any browser — a single file, no dependencies, no bui
 
 ## Provenance
 
-Original script by @programwith.fun — web port added so it runs in the browser.
+Original script by Erion Nezha — web port added so it runs in the browser.
