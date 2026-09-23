@@ -1,4 +1,3 @@
-#author @programwith.fun 
 import turtle
 import colorsys
 
